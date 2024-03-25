@@ -16,26 +16,22 @@ namespace PrismaticTools.Framework {
         /****
         ** Furnace patches
         ****/
-        public static void Farmer_GetTallyOfObject(ref int __result, int index, bool bigCraftable) {
-            if (index == 382 && !bigCraftable && __result <= 0)
-                __result = 666666;
-        }
 
         public static bool Object_PerformObjectDropInAction(ref SObject __instance, ref bool __result, ref Item dropInItem, bool probe, Farmer who) {
             if (!(dropInItem is SObject object1))
                 return false;
 
-            if (object1.ParentSheetIndex != 74)
+            if (object1.ParentSheetIndex != Object.prismaticShardIndex)
                 return true;
 
             if (__instance.name.Equals("Furnace")) {
-                if (who.IsLocalPlayer && who.getTallyOfObject(382, false) == 666666) {
+                if (who.IsLocalPlayer && who.Items.CountId(Object.coalQID) <= 0) {
                     if (!probe && who.IsLocalPlayer)
                         Game1.showRedMessage(Game1.content.LoadString("Strings\\StringsFromCSFiles:Object.cs.12772"));
                     return false;
                 }
                 if (__instance.heldObject.Value == null && !probe) {
-                    __instance.heldObject.Value = new SObject(PrismaticBarItem.INDEX, 5);
+                    __instance.heldObject.Value = new SObject(PrismaticBarItem.INDEX.ToString(), 5);
                     __instance.MinutesUntilReady = 2400;
                     who.currentLocation.playSound("furnace");
                     __instance.initializeLightSource(__instance.TileLocation);
@@ -46,7 +42,7 @@ namespace PrismaticTools.Framework {
                         alphaFade = 0.005f
                     });
                     for (int index = who.Items.Count - 1; index >= 0; --index) {
-                        if (who.Items[index] is SObject obj && obj.ParentSheetIndex == 382) {
+                        if (who.Items[index] is SObject obj && obj.ParentSheetIndex == Object.coal) {
                             --who.Items[index].Stack;
                             if (who.Items[index].Stack <= 0) {
                                 who.Items[index] = null;
@@ -59,9 +55,9 @@ namespace PrismaticTools.Framework {
                     __result = object1.Stack <= 0;
                     return false;
                 }
-                if (__instance.heldObject.Value == null & probe) {
-                    if (object1.ParentSheetIndex == 74) {
-                        __instance.heldObject.Value = new SObject();
+                if (__instance.heldObject.Value == null && probe) {
+                    if (object1.ParentSheetIndex == Object.prismaticShardIndex) {
+                        //__instance.heldObject.Value = new SObject(); // Ends up spawning a -1 Object
                         __result = true;
                         return false;
                     }
@@ -110,22 +106,17 @@ namespace PrismaticTools.Framework {
             return false;
         }
 
-        public static void After_Object_IsSprinkler(ref SObject __instance, ref bool __result) {
-            if (__instance.ParentSheetIndex == PrismaticSprinklerItem.INDEX)
-                __result = true;
-        }
-
         public static void After_Object_GetBaseRadiusForSprinkler(ref SObject __instance, ref int __result) {
             if (__instance.ParentSheetIndex == PrismaticSprinklerItem.INDEX)
                 __result = ModEntry.Config.SprinklerRange;
         }
 
-        public static bool Object_UpdatingWhenCurrentLocation(ref SObject __instance, GameTime time, GameLocation environment) {
+        public static bool Object_UpdatingWhenCurrentLocation(ref SObject __instance, GameTime time) {
             var obj = __instance;
 
             // enable sprinkler scarecrow/light
             if (obj.ParentSheetIndex == PrismaticSprinklerItem.INDEX)
-                TryEnablePrismaticSprinkler(environment, obj.TileLocation, obj);
+                TryEnablePrismaticSprinkler(__instance.Location, obj.TileLocation, obj);
 
             return true;
         }
@@ -144,13 +135,13 @@ namespace PrismaticTools.Framework {
         ** Tool patches
         ****/
         public static void Tree_PerformToolAction(ref Tree __instance, Tool t, int explosion) {
-            if (t is Axe axe && axe.UpgradeLevel == 5 && explosion <= 0 && ModEntry.ModHelper.Reflection.GetField<NetFloat>(__instance, "health").GetValue() > -99f) {
+            if (t is Axe axe && axe.UpgradeLevel == 5 && explosion <= 0 && ModEntry.ModHelper.Reflection.GetField<NetFloat>(__instance, "health").GetValue().Value > -99f) {
                 __instance.health.Value = 0.0f;
             }
         }
 
         public static void FruitTree_PerformToolAction(ref FruitTree __instance, Tool t, int explosion) {
-            if (t is Axe axe && axe.UpgradeLevel == 5 && explosion <= 0 && ModEntry.ModHelper.Reflection.GetField<NetFloat>(__instance, "health").GetValue() > -99f) {
+            if (t is Axe axe && axe.UpgradeLevel == 5 && explosion <= 0 && ModEntry.ModHelper.Reflection.GetField<NetFloat>(__instance, "health").GetValue().Value > -99f) {
                 __instance.health.Value = 0.0f;
             }
         }
@@ -165,7 +156,7 @@ namespace PrismaticTools.Framework {
             }
         }
 
-        public static void ResourceClump_PerformToolAction(ref ResourceClump __instance, Tool t, int damage, Vector2 tileLocation, GameLocation location) {
+        public static void ResourceClump_PerformToolAction(ref ResourceClump __instance, Tool t, int damage, Vector2 tileLocation) {
             if (t is Axe && t.UpgradeLevel == 5 && (__instance.parentSheetIndex.Value == 600 || __instance.parentSheetIndex.Value == 602)) {
                 __instance.health.Value = 0;
             }
@@ -195,30 +186,46 @@ namespace PrismaticTools.Framework {
             }
         }
 
-        public static bool Tool_Name(Tool __instance, ref string __result) {
+        public static bool Axe_MigrateLegacyItemId(Axe __instance) {
             if (__instance.UpgradeLevel == 5) {
-
-                switch (__instance.BaseName) {
-                    case "Axe": __result = ModEntry.ModHelper.Translation.Get("prismaticAxe"); break;
-                    case "Pickaxe": __result = ModEntry.ModHelper.Translation.Get("prismaticPickaxe"); break;
-                    case "Watering Can": __result = ModEntry.ModHelper.Translation.Get("prismaticWatercan"); break;
-                    case "Hoe": __result = ModEntry.ModHelper.Translation.Get("prismaticHoe"); break;
-                }
-                //__result = "Prismatic " + __instance.BaseName;
-                //__result = ModEntry.ModHelper.Translation.Get("prismatic.prefix") + " " + Game1.content.LoadString("Strings\\StringsFromCSFiles:Axe.cs.1");
+                __instance.ItemId = "PrismaticAxe";
                 return false;
             }
             return true;
         }
 
-        public static bool Tool_DisplayName(Tool __instance, ref string __result) {
+        public static bool WateringCan_MigrateLegacyItemId(WateringCan __instance) {
             if (__instance.UpgradeLevel == 5) {
-                __result = __instance.Name;
+                __instance.ItemId = "PrismaticWateringCan";
                 return false;
             }
             return true;
         }
 
+        public static bool Pickaxe_MigrateLegacyItemId(Pickaxe __instance) {
+            if (__instance.UpgradeLevel == 5) {
+                __instance.ItemId = "PrismaticPickaxe";
+                return false;
+            }
+            return true;
+        }
+
+        public static bool Hoe_MigrateLegacyItemId(Hoe __instance) {
+            if (__instance.UpgradeLevel == 5) {
+                __instance.ItemId = "PrismaticHoe";
+                return false;
+            }
+            return true;
+        }
+
+        public static void Tool_Update(Tool __instance, Farmer who) {
+            // The watering can naturally pushes the upward facing to a blank sqaure. The next after
+            // the prismatic up spirte is the fishing pole. Instead we should reset to the beginning and go backward
+            // by one to use that blank area.
+            if (__instance is WateringCan && who.FacingDirection == 0) {
+                __instance.CurrentParentTileIndex = __instance.InitialParentTileIndex - 1;
+            }
+        }
 
         /*********
         ** Private methods

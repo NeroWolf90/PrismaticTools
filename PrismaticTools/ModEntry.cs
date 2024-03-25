@@ -6,6 +6,7 @@ using PrismaticTools.Framework;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.GameData.Tools;
 using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 
@@ -33,8 +34,7 @@ namespace PrismaticTools {
             helper.Events.GameLoop.UpdateTicked += this.OnUpdateTicked;
             helper.Events.Player.InventoryChanged += this.OnInventoryChanged;
             helper.Events.Content.AssetRequested += this.OnAssetRequested;
-
-            BlacksmithInitializer.Init(helper.Events);
+            helper.Events.GameLoop.GameLaunched += this.OnGameLauched;
 
             this.InitColors();
 
@@ -45,10 +45,6 @@ namespace PrismaticTools {
         private void ApplyPatches(Harmony harmony) {
             // furnaces
             harmony.Patch(
-                original: AccessTools.Method(typeof(Farmer), nameof(Farmer.getTallyOfObject)),
-                prefix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Farmer_GetTallyOfObject))
-            );
-            harmony.Patch(
                 original: AccessTools.Method(typeof(Object), nameof(Object.performObjectDropInAction)),
                 prefix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Object_PerformObjectDropInAction))
             );
@@ -57,10 +53,6 @@ namespace PrismaticTools {
             harmony.Patch(
                 original: AccessTools.Method(typeof(Farm), nameof(Farm.addCrows)),
                 prefix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Farm_AddCrows))
-            );
-            harmony.Patch(
-                original: AccessTools.Method(typeof(Object), nameof(Object.IsSprinkler)),
-                postfix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.After_Object_IsSprinkler))
             );
             harmony.Patch(
                 original: AccessTools.Method(typeof(Object), nameof(Object.GetBaseRadiusForSprinkler)),
@@ -97,12 +89,24 @@ namespace PrismaticTools {
                 postfix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Tool_TilesAffected_Postfix))
             );
             harmony.Patch(
-                original: AccessTools.Property(typeof(Tool), nameof(Tool.Name)).GetMethod,
-                prefix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Tool_Name))
+                original: AccessTools.Method(typeof(Axe), "MigrateLegacyItemId"),
+                prefix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Axe_MigrateLegacyItemId))
             );
             harmony.Patch(
-                original: AccessTools.Property(typeof(Tool), nameof(Tool.DisplayName)).GetMethod,
-                prefix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Tool_DisplayName))
+                original: AccessTools.Method(typeof(WateringCan), "MigrateLegacyItemId"),
+                prefix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.WateringCan_MigrateLegacyItemId))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Pickaxe), "MigrateLegacyItemId"),
+                prefix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Pickaxe_MigrateLegacyItemId))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Hoe), "MigrateLegacyItemId"),
+                prefix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Hoe_MigrateLegacyItemId))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Tool), nameof(Tool.Update)),
+                postfix: new HarmonyMethod(typeof(PrismaticPatches), nameof(PrismaticPatches.Tool_Update))
             );
         }
 
@@ -139,8 +143,17 @@ namespace PrismaticTools {
 
         private void UpgradeTools(string command, string[] args) {
             foreach (Item item in Game1.player.Items) {
-                if (item is Axe || item is WateringCan || item is Pickaxe || item is Hoe) {
-                    (item as Tool).UpgradeLevel = 5;
+                if ((item is Axe || item is WateringCan || item is Pickaxe || item is Hoe) && (item as Tool).UpgradeLevel != 5) {
+                    Tool t = (item as Tool);
+                    int upgrades = 5 - t.UpgradeLevel;
+                    // Offset Tile sprite by how many upgrades we have to make
+                    // If upgrading over 3, skip 21 slots to align with the next row.
+                    t.InitialParentTileIndex += upgrades >= 3 ? 7 * upgrades + 21 : 7 * (upgrades);
+                    t.UpgradeLevel = 5;
+                    if (item is Axe) { t.ItemId = "PrismaticAxe"; }
+                    else if (item is WateringCan) { t.ItemId = "PrismaticWateringCan"; }
+                    else if (item is Pickaxe) { t.ItemId = "PrismaticPickaxe"; }
+                    else if (item is Hoe) { t.ItemId = "PrismaticHoe"; }
                 }
             }
         }
@@ -202,6 +215,51 @@ namespace PrismaticTools {
         /// <param name="e">The event arguments.</param>
         private void OnAssetRequested(object sender, AssetRequestedEventArgs e) {
             this.AssetEditor.OnAssetRequested(e);
+        }
+
+        /// <summary>Raised when the game is launched for the first time.</summary>
+        /// <param name="sender">The event sender.</param>
+        /// <param name="e">The event arguments</param>
+        private void OnGameLauched(object sender, GameLaunchedEventArgs e) {
+            Game1.toolData.Add("PrismaticAxe", this.DuplicateAndInitData(Game1.toolData["IridiumAxe"], "prismaticAxe", this.CreateUpgradeData("IridiumAxe")));
+            Game1.toolData.Add("PrismaticWateringCan", this.DuplicateAndInitData(Game1.toolData["IridiumWateringCan"], "prismaticWatercan", this.CreateUpgradeData("IridiumWateringCan")));
+            Game1.toolData.Add("PrismaticPickaxe", this.DuplicateAndInitData(Game1.toolData["IridiumPickaxe"], "prismaticPickaxe", this.CreateUpgradeData("IridiumPickaxe")));
+            Game1.toolData.Add("PrismaticHoe", this.DuplicateAndInitData(Game1.toolData["IridiumHoe"], "prismaticHoe", this.CreateUpgradeData("IridiumHoe")));
+        }
+
+        /// <summary>Duplicates data from the passed in Tool Data and sets and fields that need to be updated.</summary>
+        /// <param name="data">The ToolData class to copy</param>
+        /// <param name="name">The name of the new tool being added.</param>
+        /// <param name="upgradeData">Tool upgrade information that describes who this tool upgrades from.</param>
+        /// <param name="offsetSprite">The offset from the parent sprite.</param>
+        /// <param name="offsetMenuSprite">The offset from the parent menu sprite.</param>
+        /// <returns>A fillde out ToolData class.</returns>
+        private ToolData DuplicateAndInitData(ToolData data, string name, ToolUpgradeData upgradeData, int offsetSprite = 7, int offsetMenuSprite = 7) {
+            ToolData newData = new ToolData();
+            newData.ClassName = data.ClassName;
+            newData.Name = name;
+            newData.AttachmentSlots = data.AttachmentSlots;
+            newData.DisplayName = ModEntry.ModHelper.Translation.Get(name);
+            newData.Description = data.Description;
+            newData.Texture = data.Texture;
+            newData.SpriteIndex = data.SpriteIndex + offsetSprite;
+            newData.MenuSpriteIndex = data.MenuSpriteIndex + offsetMenuSprite;
+            newData.UpgradeLevel = data.UpgradeLevel + 1;
+            newData.CanBeLostOnDeath = data.CanBeLostOnDeath;
+            newData.UpgradeFrom = new List<ToolUpgradeData> { upgradeData };
+            return newData;
+        }
+
+        /// <summary>Creates a new ToolUpgradeData setting the passed in id as the tool to upgrade from.</summary>
+        /// <param name="requiredToolId">Name of the parent tool to upgrade from.</param>
+        /// <returns>A filled out ToolUpgradeData class.</returns>
+        private ToolUpgradeData CreateUpgradeData(string requiredToolId) {
+            ToolUpgradeData newData = new ToolUpgradeData();
+            newData.Price = ModEntry.Config.PrismaticToolCost;
+            newData.TradeItemId = PrismaticBarItem.INDEX.ToString();
+            newData.RequireToolId = requiredToolId;
+            newData.TradeItemAmount = 5;
+            return newData;
         }
 
         private void InitColors() {

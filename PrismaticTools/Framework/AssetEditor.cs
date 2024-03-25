@@ -3,6 +3,8 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
+using StardewValley;
+using StardewValley.GameData.Objects;
 
 namespace PrismaticTools.Framework {
     public class AssetEditor {
@@ -27,12 +29,12 @@ namespace PrismaticTools.Framework {
             }
 
             // new item data
-            else if (e.NameWithoutLocale.IsEquivalentTo("Data/ObjectInformation")) {
+            else if (e.NameWithoutLocale.IsEquivalentTo("Data/Objects")) {
                 e.Edit(asset => {
-                    var data = asset.AsDictionary<int, string>().Data;
+                    var data = asset.AsDictionary<string, ObjectData>().Data;
 
-                    data.Add(PrismaticBarItem.INDEX, $"{this.barName}/{PrismaticBarItem.PRICE}/{PrismaticBarItem.EDIBILITY}/{PrismaticBarItem.TYPE} {PrismaticBarItem.CATEGORY}/{this.barName}/{this.barDesc}");
-                    data.Add(PrismaticSprinklerItem.INDEX, $"{this.sprinklerName}/{PrismaticSprinklerItem.PRICE}/{PrismaticSprinklerItem.EDIBILITY}/{PrismaticSprinklerItem.TYPE} {PrismaticSprinklerItem.CATEGORY}/{this.sprinklerName}/{this.sprinklerDesc}");
+                    data.Add(PrismaticBarItem.INDEX.ToString(), new ObjectData { Name = this.barName, DisplayName = this.barName, Description = this.barDesc, Price = PrismaticBarItem.PRICE, Type = PrismaticBarItem.TYPE, Category = PrismaticBarItem.CATEGORY, Edibility = PrismaticBarItem.EDIBILITY, SpriteIndex = PrismaticBarItem.INDEX });
+                    data.Add(PrismaticSprinklerItem.INDEX.ToString(), new ObjectData { Name = this.sprinklerName, DisplayName = this.sprinklerName, Description = this.sprinklerDesc, Price = PrismaticSprinklerItem.PRICE, Type = PrismaticSprinklerItem.TYPE, Category = PrismaticSprinklerItem.CATEGORY, Edibility = PrismaticSprinklerItem.EDIBILITY, SpriteIndex = PrismaticSprinklerItem.INDEX });
                 });
             }
 
@@ -47,9 +49,9 @@ namespace PrismaticTools.Framework {
                         newDict.Add(key, data[key]);
                         if (key.Equals("Iridium Sprinkler")) {
                             if (asset.Locale != "en")
-                                newDict.Add("Prismatic Sprinkler", $"{PrismaticBarItem.INDEX} 2 787 2/Home/{PrismaticSprinklerItem.INDEX}/false/Farming {PrismaticSprinklerItem.CRAFTING_LEVEL}/{this.sprinklerName}");
+                                newDict.Add("Prismatic Sprinkler", $"{PrismaticBarItem.INDEX.ToString()} 2 787 2/Home/{PrismaticSprinklerItem.INDEX.ToString()}/false/Farming {PrismaticSprinklerItem.CRAFTING_LEVEL}/{this.sprinklerName}");
                             else
-                                newDict.Add("Prismatic Sprinkler", $"{PrismaticBarItem.INDEX} 2 787 2/Home/{PrismaticSprinklerItem.INDEX}/false/Farming {PrismaticSprinklerItem.CRAFTING_LEVEL}");
+                                newDict.Add("Prismatic Sprinkler", $"{PrismaticBarItem.INDEX.ToString()} 2 787 2/Home/{PrismaticSprinklerItem.INDEX.ToString()}/false/Farming {PrismaticSprinklerItem.CRAFTING_LEVEL}");
                         }
                     }
 

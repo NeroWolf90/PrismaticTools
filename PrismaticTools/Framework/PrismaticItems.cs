@@ -3,6 +3,7 @@ using StardewValley;
 namespace PrismaticTools.Framework {
     public class PrismaticSprinklerItem {
         public const int INDEX = 1113;
+        public const string ID = "(O)1113";
         public const int PRICE = 2000;
         public const int EDIBILITY = -300;
         public const string TYPE = "Crafting";
@@ -12,6 +13,7 @@ namespace PrismaticTools.Framework {
 
     public class PrismaticBarItem : Object {
         public const int INDEX = 1112;
+        public const string ID = "(O)1112";
         public const int PRICE = 2500;
         public const string TYPE = "Basic";
         public const int CATEGORY = metalResources;
